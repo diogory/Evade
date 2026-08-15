@@ -1,0 +1,519 @@
+local Players=game:GetService("Players")
+local RunService=game:GetService("RunService")
+local UIS=game:GetService("UserInputService")
+local Lighting=game:GetService("Lighting")
+local Workspace=game:GetService("Workspace")
+
+local LP=Players.LocalPlayer
+local PG=LP:WaitForChild("PlayerGui")
+
+local ESP_ON=false
+local FIX_ON=false
+local FULL_ON=false
+local BEAUTY_ON=false
+
+local ESP={}
+local SAVED={}
+local EFFECTS={}
+
+local oldLighting={
+	Brightness=Lighting.Brightness,
+	ClockTime=Lighting.ClockTime,
+	FogEnd=Lighting.FogEnd,
+	GlobalShadows=Lighting.GlobalShadows,
+	Ambient=Lighting.Ambient,
+	OutdoorAmbient=Lighting.OutdoorAmbient,
+	Diffuse=Lighting.EnvironmentDiffuseScale,
+	Specular=Lighting.EnvironmentSpecularScale,
+	Exposure=Lighting.ExposureCompensation
+}
+
+local oldTerrainDecoration=nil
+pcall(function()
+	oldTerrainDecoration=Workspace.Terrain.Decoration
+end)
+
+local Gui=Instance.new("ScreenGui")
+Gui.Name="DIO"
+Gui.ResetOnSpawn=false
+Gui.IgnoreGuiInset=true
+Gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+Gui.Parent=PG
+
+local function corner(o,r)
+	local c=Instance.new("UICorner")
+	c.CornerRadius=UDim.new(0,r)
+	c.Parent=o
+end
+
+local Mini=Instance.new("TextButton")
+Mini.Name="MiniApp"
+Mini.Size=UDim2.fromOffset(32,32)
+Mini.Position=UDim2.fromOffset(10,100)
+Mini.Text="D"
+Mini.TextSize=13
+Mini.Font=Enum.Font.GothamBold
+Mini.TextColor3=Color3.new(1,1,1)
+Mini.BackgroundColor3=Color3.fromRGB(25,25,30)
+Mini.BorderSizePixel=0
+Mini.Parent=Gui
+corner(Mini,7)
+
+local Menu=Instance.new("Frame")
+Menu.Name="Menu"
+Menu.Size=UDim2.fromOffset(285,205)
+Menu.Position=UDim2.new(.5,-142,.5,-102)
+Menu.BackgroundColor3=Color3.fromRGB(17,17,22)
+Menu.BorderSizePixel=0
+Menu.Visible=false
+Menu.Parent=Gui
+corner(Menu,10)
+
+local Title=Instance.new("TextLabel")
+Title.Size=UDim2.new(1,-16,0,28)
+Title.Position=UDim2.fromOffset(8,5)
+Title.Text="DIO"
+Title.TextSize=14
+Title.Font=Enum.Font.GothamBold
+Title.TextColor3=Color3.new(1,1,1)
+Title.BackgroundTransparency=1
+Title.Parent=Menu
+
+local function button(text,y)
+	local b=Instance.new("TextButton")
+	b.Size=UDim2.new(1,-16,0,35)
+	b.Position=UDim2.fromOffset(8,y)
+	b.Text=text
+	b.TextSize=10
+	b.Font=Enum.Font.GothamBold
+	b.TextColor3=Color3.new(1,1,1)
+	b.BackgroundColor3=Color3.fromRGB(42,42,50)
+	b.BorderSizePixel=0
+	b.Parent=Menu
+	corner(b,7)
+	return b
+end
+
+local ESPButton=button("BOT ESP: OFF",38)
+local FullButton=button("FULLBRIGHT: OFF",79)
+local FixButton=button("SUPER FIX: OFF",120)
+local BeautyButton=button("BEAUTY: OFF",161)
+
+local function humanoid(model)
+	if not model or not model:IsA("Model") then
+		return nil
+	end
+
+	return model:FindFirstChildOfClass("Humanoid")
+end
+
+local function root(model)
+	if not model or not model:IsA("Model") then
+		return nil
+	end
+
+	return model:FindFirstChild("HumanoidRootPart")
+		or model:FindFirstChild("RootPart")
+		or model.PrimaryPart
+end
+
+local function isBot(model)
+	if not model or not model:IsA("Model") then
+		return false
+	end
+
+	if Players:GetPlayerFromCharacter(model) then
+		return false
+	end
+
+	local h=humanoid(model)
+	local r=root(model)
+
+	if not h or not r then
+		return false
+	end
+
+	return h.Health>0
+end
+
+local function removeESP(model)
+	local data=ESP[model]
+
+	if not data then
+		return
+	end
+
+	if data.Highlight then
+		data.Highlight:Destroy()
+	end
+
+	if data.NameTag then
+		data.NameTag:Destroy()
+	end
+
+	ESP[model]=nil
+end
+
+local function addESP(model)
+	if ESP[model] then
+		return
+	end
+
+	local r=root(model)
+
+	if not r then
+		return
+	end
+
+	local highlight=Instance.new("Highlight")
+	highlight.Name="DIO_BOT_ESP"
+	highlight.Adornee=model
+	highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.FillTransparency=.45
+	highlight.OutlineTransparency=0
+	highlight.FillColor=Color3.fromRGB(255,70,45)
+	highlight.OutlineColor=Color3.fromRGB(255,200,80)
+	highlight.Parent=Gui
+
+	local bill=Instance.new("BillboardGui")
+	bill.Name="DIO_BOT_NAME"
+	bill.Adornee=r
+	bill.Size=UDim2.fromOffset(110,24)
+	bill.StudsOffset=Vector3.new(0,3.5,0)
+	bill.AlwaysOnTop=true
+	bill.MaxDistance=2500
+	bill.Parent=Gui
+
+	local label=Instance.new("TextLabel")
+	label.Size=UDim2.fromScale(1,1)
+	label.BackgroundTransparency=1
+	label.Text="BOT"
+	label.TextSize=11
+	label.Font=Enum.Font.GothamBold
+	label.TextColor3=Color3.fromRGB(255,90,70)
+	label.TextStrokeTransparency=.1
+	label.TextStrokeColor3=Color3.new(0,0,0)
+	label.Parent=bill
+
+	ESP[model]={
+		Highlight=highlight,
+		NameTag=bill
+	}
+end
+
+local function clearESP()
+	for model in pairs(ESP) do
+		removeESP(model)
+	end
+end
+
+local function updateESP()
+	if not ESP_ON then
+		clearESP()
+		return
+	end
+
+	local active={}
+
+	for _,model in ipairs(Workspace:GetDescendants()) do
+		if model:IsA("Model") and isBot(model) then
+			active[model]=true
+			addESP(model)
+		end
+	end
+
+	for model in pairs(ESP) do
+		if not active[model]
+			or not model.Parent
+			or not isBot(model) then
+
+			removeESP(model)
+		end
+	end
+end
+
+local function setFullbright(state)
+	FULL_ON=state
+
+	FullButton.Text=
+		state and "FULLBRIGHT: ON"
+		or "FULLBRIGHT: OFF"
+
+	if state then
+		Lighting.Brightness=3
+		Lighting.ClockTime=14
+		Lighting.FogEnd=100000
+		Lighting.GlobalShadows=false
+		Lighting.Ambient=Color3.new(1,1,1)
+		Lighting.OutdoorAmbient=Color3.new(1,1,1)
+	else
+		Lighting.Brightness=oldLighting.Brightness
+		Lighting.ClockTime=oldLighting.ClockTime
+		Lighting.FogEnd=oldLighting.FogEnd
+		Lighting.GlobalShadows=oldLighting.GlobalShadows
+		Lighting.Ambient=oldLighting.Ambient
+		Lighting.OutdoorAmbient=oldLighting.OutdoorAmbient
+	end
+end
+
+local function saveObject(obj)
+	if SAVED[obj] then
+		return
+	end
+
+	if obj:IsA("BasePart") then
+		SAVED[obj]={1,obj.CastShadow}
+
+	elseif obj:IsA("ParticleEmitter") then
+		SAVED[obj]={2,obj.Enabled,obj.Rate}
+
+	elseif obj:IsA("Trail")
+		or obj:IsA("Beam")
+		or obj:IsA("Smoke")
+		or obj:IsA("Fire")
+		or obj:IsA("Sparkles")
+		or obj:IsA("PointLight")
+		or obj:IsA("SpotLight")
+		or obj:IsA("SurfaceLight")
+		or obj:IsA("PostEffect") then
+
+		SAVED[obj]={3,obj.Enabled}
+	end
+end
+
+local function optimize(obj)
+	if not FIX_ON then
+		return
+	end
+
+	saveObject(obj)
+
+	if obj:IsA("BasePart") then
+		obj.CastShadow=false
+
+	elseif obj:IsA("ParticleEmitter") then
+		obj.Enabled=false
+		obj.Rate=0
+
+	elseif obj:IsA("Trail")
+		or obj:IsA("Beam")
+		or obj:IsA("Smoke")
+		or obj:IsA("Fire")
+		or obj:IsA("Sparkles")
+		or obj:IsA("PointLight")
+		or obj:IsA("SpotLight")
+		or obj:IsA("SurfaceLight")
+		or obj:IsA("PostEffect") then
+
+		obj.Enabled=false
+	end
+end
+
+local function setFix(state)
+	FIX_ON=state
+
+	FixButton.Text=
+		state and "SUPER FIX: ON"
+		or "SUPER FIX: OFF"
+
+	if state then
+		Lighting.GlobalShadows=false
+		Lighting.EnvironmentDiffuseScale=.1
+		Lighting.EnvironmentSpecularScale=0
+
+		pcall(function()
+			Workspace.Terrain.Decoration=false
+		end)
+
+		for _,obj in ipairs(Workspace:GetDescendants()) do
+			optimize(obj)
+		end
+	else
+		for obj,data in pairs(SAVED) do
+			if obj.Parent then
+				pcall(function()
+					if data[1]==1 then
+						obj.CastShadow=data[2]
+
+					elseif data[1]==2 then
+						obj.Enabled=data[2]
+						obj.Rate=data[3]
+
+					elseif data[1]==3 then
+						obj.Enabled=data[2]
+					end
+				end)
+			end
+		end
+
+		table.clear(SAVED)
+
+		Lighting.GlobalShadows=oldLighting.GlobalShadows
+		Lighting.EnvironmentDiffuseScale=oldLighting.Diffuse
+		Lighting.EnvironmentSpecularScale=oldLighting.Specular
+
+		if oldTerrainDecoration~=nil then
+			pcall(function()
+				Workspace.Terrain.Decoration=oldTerrainDecoration
+			end)
+		end
+	end
+end
+
+local function setBeauty(state)
+	BEAUTY_ON=state
+
+	BeautyButton.Text=
+		state and "BEAUTY: ON"
+		or "BEAUTY: OFF"
+
+	for _,effect in ipairs(EFFECTS) do
+		if effect and effect.Parent then
+			effect:Destroy()
+		end
+	end
+
+	table.clear(EFFECTS)
+
+	if not state then
+		Lighting.ExposureCompensation=oldLighting.Exposure
+		return
+	end
+
+	local cc=Instance.new("ColorCorrectionEffect")
+	cc.Name="DIO_COLOR"
+	cc.Brightness=.02
+	cc.Contrast=.15
+	cc.Saturation=.1
+	cc.TintColor=Color3.fromRGB(255,248,240)
+	cc.Parent=Lighting
+	table.insert(EFFECTS,cc)
+
+	local bloom=Instance.new("BloomEffect")
+	bloom.Name="DIO_BLOOM"
+	bloom.Intensity=.18
+	bloom.Size=18
+	bloom.Threshold=1.1
+	bloom.Parent=Lighting
+	table.insert(EFFECTS,bloom)
+
+	local atmosphere=Instance.new("Atmosphere")
+	atmosphere.Name="DIO_ATMOSPHERE"
+	atmosphere.Density=.25
+	atmosphere.Haze=.12
+	atmosphere.Glare=.04
+	atmosphere.Color=Color3.fromRGB(215,225,255)
+	atmosphere.Decay=Color3.fromRGB(120,130,160)
+	atmosphere.Parent=Lighting
+	table.insert(EFFECTS,atmosphere)
+
+	Lighting.ExposureCompensation=.1
+end
+
+ESPButton.MouseButton1Click:Connect(function()
+	ESP_ON=not ESP_ON
+
+	ESPButton.Text=
+		ESP_ON and "BOT ESP: ON"
+		or "BOT ESP: OFF"
+
+	updateESP()
+end)
+
+FullButton.MouseButton1Click:Connect(function()
+	setFullbright(not FULL_ON)
+end)
+
+FixButton.MouseButton1Click:Connect(function()
+	setFix(not FIX_ON)
+end)
+
+BeautyButton.MouseButton1Click:Connect(function()
+	setBeauty(not BEAUTY_ON)
+end)
+
+Mini.MouseButton1Click:Connect(function()
+	Menu.Visible=not Menu.Visible
+end)
+
+local dragging=false
+local dragStart
+local startPos
+
+Mini.InputBegan:Connect(function(input)
+	if input.UserInputType==Enum.UserInputType.Touch
+		or input.UserInputType==Enum.UserInputType.MouseButton1 then
+
+		dragging=true
+		dragStart=input.Position
+		startPos=Mini.Position
+	end
+end)
+
+Mini.InputEnded:Connect(function(input)
+	if input.UserInputType==Enum.UserInputType.Touch
+		or input.UserInputType==Enum.UserInputType.MouseButton1 then
+
+		dragging=false
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if not dragging then
+		return
+	end
+
+	if input.UserInputType~=Enum.UserInputType.Touch
+		and input.UserInputType~=Enum.UserInputType.MouseMovement then
+		return
+	end
+
+	local delta=input.Position-dragStart
+
+	Mini.Position=UDim2.new(
+		startPos.X.Scale,
+		startPos.X.Offset+delta.X,
+		startPos.Y.Scale,
+		startPos.Y.Offset+delta.Y
+	)
+end)
+
+Workspace.DescendantAdded:Connect(function(obj)
+	if FIX_ON then
+		task.defer(function()
+			if obj.Parent then
+				optimize(obj)
+			end
+		end)
+	end
+end)
+
+local timer=0
+
+RunService.Heartbeat:Connect(function(dt)
+	timer+=dt
+
+	if timer>=.2 then
+		timer=0
+
+		if ESP_ON then
+			updateESP()
+		end
+	end
+end)
+
+LP.CharacterAdded:Connect(function()
+	task.wait(.25)
+
+	if FULL_ON then
+		setFullbright(true)
+	end
+
+	if FIX_ON then
+		setFix(true)
+	end
+
+	if BEAUTY_ON then
+		setBeauty(true)
+	end
+end)
